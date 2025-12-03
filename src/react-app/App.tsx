@@ -8,14 +8,24 @@ function App() {
 	const [loading, setLoading] = useState(false);
 	const [success, setSuccess] = useState(false);
 
+	// Extract path segment from current URL
+	const getPathSegment = (): string => {
+		const pathname = window.location.pathname;
+		const segments = pathname.split("/").filter(Boolean);
+		return segments[0] || "";
+	};
+
 	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		setError("");
 		setLoading(true);
 		setSuccess(false);
 
+		const pathSegment = getPathSegment();
+		const apiPath = pathSegment ? `/${pathSegment}/api/login` : "/api/login";
+
 		try {
-			const response = await fetch("/api/login", {
+			const response = await fetch(apiPath, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
