@@ -26,13 +26,13 @@ const handleLogin = async (c: AppContext, pathSegment?: string) => {
 };
 
 // Handle API routes with path segment: /:pathSegment/api/login
-app.post("/:pathSegment/api/login", async (c) => {
+app.post("/:pathSegment/api/create-account", async (c) => {
 	const pathSegment = c.req.param("pathSegment");
 	return handleLogin(c, pathSegment);
 });
 
 // Handle root API route: /api/login (for backward compatibility or root access)
-app.post("/api/login", async (c) => {
+app.post("/api/create-account", async (c) => {
 	return handleLogin(c);
 });
 

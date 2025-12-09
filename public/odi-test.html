@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>
+        const fpjsToken = 'eDfRKapeDy4otXlFqxCz'
+    
+        import(`https://procdn.fpjs.sh/v4/${fpjsToken}`)
+            .then(fp => fp.start())
+            .then(fp => fp.collect())
+            .then(collectResult => {
+                console.log({collectResult})
+            })
+    </script>
+</body>
+</html>

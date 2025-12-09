@@ -22,7 +22,7 @@ function App() {
 		setSuccess(false);
 
 		const pathSegment = getPathSegment();
-		const apiPath = pathSegment ? `/${pathSegment}/api/login` : "/api/login";
+		const apiPath = pathSegment ? `/${pathSegment}/api/create-account` : "/api/create-account";
 
 		try {
 			const response = await fetch(apiPath, {
@@ -51,7 +51,7 @@ function App() {
 	return (
 		<div className="login-container">
 			<div className="login-card">
-				<h1>Login</h1>
+				<h1>Sign up</h1>
 				<form onSubmit={handleSubmit}>
 					<div className="form-group">
 						<label htmlFor="email">Email</label>
@@ -77,10 +77,10 @@ function App() {
 					</div>
 					<div className="message-container">
 						{error && <div className="error-message">{error}</div>}
-						{success && <div className="success-message">Login successful!</div>}
+						{success && <div className="success-message">Account created successfully!</div>}
 					</div>
 					<button type="submit" disabled={loading} className="login-button">
-						{loading ? "Logging in..." : "Login"}
+						{loading ? "Creating account..." : "Create account"}
 					</button>
 				</form>
 			</div>
