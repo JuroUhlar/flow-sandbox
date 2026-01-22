@@ -93,10 +93,8 @@ const handleFormSubmission = async (c: AppContext) => {
 		let rawBodyHasMultipartFpData = false;
 		let rawBodyHasFpDataSubstring = false;
 		let multipartBoundaryFromBody: string | null = null;
-		let rawTextForFallback: string | null = null;
 		try {
 			const rawText = await c.req.raw.clone().text();
-			rawTextForFallback = rawText;
 			rawBodyLength = rawText.length;
 			rawBodyLooksMultipart = rawText.startsWith("--") && rawText.includes("Content-Disposition: form-data;");
 			rawBodyHasUrlencodedEmail = rawText.includes("email=");
@@ -161,63 +159,11 @@ const handleFormSubmission = async (c: AppContext) => {
 			);
 		}
 
-		const parseMultipartFromRaw = (rawText: string): Record<string, string> | null => {
-			// Very small, tolerant multipart parser that does NOT rely on Content-Type boundary.
-			// We only need it for email/password/fp-data when an intermediary strips the boundary header.
-			if (!(rawText.startsWith("--") && rawText.includes("Content-Disposition: form-data;"))) return null;
-
-			const firstLine = rawText.split("\n", 1)[0]?.trimEnd() ?? "";
-			if (!firstLine.startsWith("--") || firstLine.length <= 2) return null;
-			const boundary = firstLine.slice(2);
-			const marker = `--${boundary}`;
-			const endMarker = `--${boundary}--`;
-
-			const parts = rawText.split(marker);
-			const out: Record<string, string> = {};
-
-			for (const part of parts) {
-				const trimmed = part.trim();
-				if (!trimmed || trimmed === "--" || trimmed === endMarker) continue;
-
-				// Separate headers and body
-				const headerEndIdx = trimmed.indexOf("\r\n\r\n");
-				if (headerEndIdx < 0) continue;
-				const headerBlock = trimmed.slice(0, headerEndIdx);
-				const bodyBlock = trimmed.slice(headerEndIdx + 4);
-
-				const nameMatch = headerBlock.match(/name="([^"]+)"/);
-				if (!nameMatch) continue;
-				const name = nameMatch[1]!;
-
-				// Body may include trailing boundary newlines; be conservative
-				const value = bodyBlock.replace(/\r\n$/, "");
-				out[name] = value;
-			}
-
-			return out;
-		};
-
 		const formData = await c.req.parseBody();
 
-		// If parseBody failed due to header/body mismatch, try fallback multipart parsing.
-		// Symptom: keys contain the raw boundary line / header fragments.
-		const parsedKeys = Object.keys(formData);
-		const parseLooksBroken =
-			parsedKeys.length === 1 && parsedKeys[0]?.includes("Content-Disposition: form-data; name") === true;
-
-		const fallback =
-			rawTextForFallback && (parseLooksBroken || (rawBodyLooksMultipart && contentType.includes("application/x-www-form-urlencoded")))
-				? parseMultipartFromRaw(rawTextForFallback)
-				: null;
-
-		const effective = fallback ? { ...formData, ...fallback } : formData;
-
-		const email = String((effective as Record<string, unknown>).email ?? "");
-		const password = String((effective as Record<string, unknown>).password ?? "");
-		const fpData = String((effective as Record<string, unknown>)["fp-data"] ?? "");
-		const fallbackFieldLengths = fallback
-			? Object.fromEntries(Object.entries(fallback).map(([k, v]) => [k, v.length]))
-			: {};
+		const email = String((formData as Record<string, unknown>).email ?? "");
+		const password = String((formData as Record<string, unknown>).password ?? "");
+		const fpData = String((formData as Record<string, unknown>)["fp-data"] ?? "");
 
 		console.log(
 			"[form-submit] parsed",
@@ -225,9 +171,6 @@ const handleFormSubmission = async (c: AppContext) => {
 				reqId,
 				pathSegment,
 				keys: Object.keys(formData).sort(),
-				fallbackUsed: Boolean(fallback),
-				fallbackKeys: fallback ? Object.keys(fallback).sort() : [],
-				fallbackFieldLengths,
 				emailPresent: email.length > 0,
 				emailLength: email.length,
 				passwordPresent: password.length > 0,
@@ -351,7 +294,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Same Origin Form POST</h2>
         <p><code>${apiPath}</code></p>
-        <form id="sameOriginForm" method="POST" action="${apiPath}" target="sameOriginResult">
+        <form id="sameOriginForm" method="POST" action="${apiPath}" enctype="multipart/form-data" target="sameOriginResult">
             <input type="hidden" name="email" id="sameOriginEmail">
             <input type="hidden" name="password" id="sameOriginPassword">
             <button type="submit">Submit Form (Same Origin)</button>
@@ -363,7 +306,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Cross Origin Form POST</h2>
         <p><code>${crossOriginPath}</code></p>
-        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" target="crossOriginResult">
+        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" enctype="multipart/form-data" target="crossOriginResult">
             <input type="hidden" name="email" id="crossOriginEmail">
             <input type="hidden" name="password" id="crossOriginPassword">
             <button type="submit">Submit Form (Cross Origin)</button>
@@ -431,7 +374,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Same Origin</h2>
         <p><code>${apiPath}</code></p>
-        <form id="sameOriginForm" method="POST" action="${apiPath}">
+        <form id="sameOriginForm" method="POST" action="${apiPath}" enctype="multipart/form-data">
             <input type="hidden" name="email" id="sameOriginEmail">
             <input type="hidden" name="password" id="sameOriginPassword">
             <button type="submit">Submit Form (Same Origin)</button>
@@ -441,7 +384,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Cross Origin</h2>
         <p><code>${crossOriginPath}</code></p>
-        <form id="crossOriginForm" method="POST" action="${crossOriginPath}">
+        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" enctype="multipart/form-data">
             <input type="hidden" name="email" id="crossOriginEmail">
             <input type="hidden" name="password" id="crossOriginPassword">
             <button type="submit">Submit Form (Cross Origin)</button>
