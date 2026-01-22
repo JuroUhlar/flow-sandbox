@@ -66,8 +66,6 @@ app.post("/api/create-account", async (c) => {
 
 // Dedicated form submission endpoint - returns HTML for browser display
 const handleFormSubmission = async (c: AppContext) => {
-	const debug = c.req.query("debug") === "1";
-
 	// Extract path segment from URL if present (route may or may not define it)
 	const pathSegment = (() => {
 		try {
@@ -84,9 +82,17 @@ const handleFormSubmission = async (c: AppContext) => {
 	const escapeHtml = (input: string) =>
 		input.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;");
 
+	const debugFromQuery = c.req.query("debug") === "1";
+	let rawText = "";
+
 	try {
 		// Clone is important: reading body consumes the stream
-		const rawText = await c.req.raw.clone().text();
+		rawText = await c.req.raw.clone().text();
+		// Allow debug to be requested via a form field too (keeps URL unchanged)
+		// This helps when the injected fp script only triggers on specific URLs.
+		const debugFromBody = /(?:^|&)debug=1(?:&|$)/.test(rawText);
+		const debug = debugFromQuery || debugFromBody;
+
 		const formData = await c.req.parseBody();
 
 		const email = String(formData.email ?? "");
@@ -120,6 +126,7 @@ const handleFormSubmission = async (c: AppContext) => {
 					containsEmailKey: rawText.includes("email="),
 					containsPasswordKey: rawText.includes("password="),
 					containsFpDataKey: rawText.includes("fp-data="),
+					containsDebugKey: rawText.includes("debug=1"),
 				},
 				parsed: {
 					keys: Object.keys(formData).sort(),
@@ -129,6 +136,7 @@ const handleFormSubmission = async (c: AppContext) => {
 					passwordLength: password.length,
 					fpDataPresent: fpData.length > 0,
 					fpDataLength: fpData.length,
+					debugFieldPresent: String(formData.debug ?? "") === "1",
 				},
 			};
 
@@ -172,6 +180,55 @@ const handleFormSubmission = async (c: AppContext) => {
 </html>`,
 		);
 	} catch (error) {
+		// If parse fails but debug was requested via query or body, show debug info anyway.
+		const debugFromBody = /(?:^|&)debug=1(?:&|$)/.test(rawText);
+		const debug = debugFromQuery || debugFromBody;
+		if (debug) {
+			const headers = {
+				"content-type": c.req.header("content-type") ?? "",
+				"content-length": c.req.header("content-length") ?? "",
+				"sec-fetch-mode": c.req.header("sec-fetch-mode") ?? "",
+				"sec-fetch-dest": c.req.header("sec-fetch-dest") ?? "",
+				"sec-fetch-site": c.req.header("sec-fetch-site") ?? "",
+				"origin": c.req.header("origin") ?? "",
+				"referer": c.req.header("referer") ?? "",
+				"user-agent": c.req.header("user-agent") ?? "",
+			} as const;
+
+			const redactedRawText = rawText
+				.replace(/email=[^&]*/i, "email=[redacted]")
+				.replace(/password=[^&]*/i, "password=[redacted]");
+
+			const debugInfo = {
+				pathSegment,
+				method: c.req.method,
+				url: c.req.url,
+				headers,
+				error: error instanceof Error ? error.message : "Unknown error",
+				rawBody: {
+					length: rawText.length,
+					preview: redactedRawText.slice(0, 400),
+					containsEmailKey: rawText.includes("email="),
+					containsPasswordKey: rawText.includes("password="),
+					containsFpDataKey: rawText.includes("fp-data="),
+					containsDebugKey: rawText.includes("debug=1"),
+				},
+			};
+
+			return c.html(
+				`<!DOCTYPE html>
+<html>
+<head><title>Debug</title></head>
+<body>
+  <h1>Debug: /__forms/create-account (parse error)</h1>
+  <p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
+  <pre>${escapeHtml(JSON.stringify(debugInfo, null, 2))}</pre>
+</body>
+</html>`,
+				400,
+			);
+		}
+
 		return c.html(
 			`<!DOCTYPE html>
 <html>
@@ -226,7 +283,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <p>Path segment: <strong>${pathSegment || "(none)"}</strong></p>
     <label style="display:inline-flex; align-items:center; gap:8px; margin: 10px 0 0;">
         <input type="checkbox" id="debugToggle">
-        Submit with <code>?debug=1</code>
+        Include <code>debug=1</code> form field (shows server debug)
     </label>
     
     <div class="nav" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
@@ -249,6 +306,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
         <form id="sameOriginForm" method="POST" action="${apiPath}" data-base-action="${apiPath}" target="sameOriginResult">
             <input type="hidden" name="email" id="sameOriginEmail">
             <input type="hidden" name="password" id="sameOriginPassword">
+            <input type="hidden" name="debug" id="sameOriginDebug">
             <button type="submit">Submit Form (Same Origin)</button>
         </form>
         <p>Result:</p>
@@ -261,6 +319,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
         <form id="crossOriginForm" method="POST" action="${crossOriginPath}" data-base-action="${crossOriginPath}" target="crossOriginResult">
             <input type="hidden" name="email" id="crossOriginEmail">
             <input type="hidden" name="password" id="crossOriginPassword">
+            <input type="hidden" name="debug" id="crossOriginDebug">
             <button type="submit">Submit Form (Cross Origin)</button>
         </form>
         <p>Result:</p>
@@ -275,9 +334,12 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
         const crossOriginForm = document.getElementById('crossOriginForm');
 
         function updateActions() {
-            const suffix = debugToggle.checked ? '?debug=1' : '';
-            sameOriginForm.action = sameOriginForm.dataset.baseAction + suffix;
-            crossOriginForm.action = crossOriginForm.dataset.baseAction + suffix;
+            const debugValue = debugToggle.checked ? '1' : '';
+            document.getElementById('sameOriginDebug').value = debugValue;
+            document.getElementById('crossOriginDebug').value = debugValue;
+            // Keep action stable to avoid changing any instrumentation routing logic
+            sameOriginForm.action = sameOriginForm.dataset.baseAction;
+            crossOriginForm.action = crossOriginForm.dataset.baseAction;
         }
         function syncValues() {
             document.getElementById('sameOriginEmail').value = emailInput.value;
@@ -321,7 +383,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <p>These forms navigate away from the page when submitted. Use browser back button to return.</p>
     <label style="display:inline-flex; align-items:center; gap:8px; margin: 10px 0 0;">
         <input type="checkbox" id="debugToggle">
-        Submit with <code>?debug=1</code>
+        Include <code>debug=1</code> form field (shows server debug)
     </label>
     
     <div class="nav">
@@ -344,6 +406,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
         <form id="sameOriginForm" method="POST" action="${apiPath}" data-base-action="${apiPath}">
             <input type="hidden" name="email" id="sameOriginEmail">
             <input type="hidden" name="password" id="sameOriginPassword">
+            <input type="hidden" name="debug" id="sameOriginDebug">
             <button type="submit">Submit Form (Same Origin)</button>
         </form>
     </div>
@@ -354,6 +417,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
         <form id="crossOriginForm" method="POST" action="${crossOriginPath}" data-base-action="${crossOriginPath}">
             <input type="hidden" name="email" id="crossOriginEmail">
             <input type="hidden" name="password" id="crossOriginPassword">
+            <input type="hidden" name="debug" id="crossOriginDebug">
             <button type="submit">Submit Form (Cross Origin)</button>
         </form>
     </div>
@@ -366,9 +430,12 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
         const crossOriginForm = document.getElementById('crossOriginForm');
 
         function updateActions() {
-            const suffix = debugToggle.checked ? '?debug=1' : '';
-            sameOriginForm.action = sameOriginForm.dataset.baseAction + suffix;
-            crossOriginForm.action = crossOriginForm.dataset.baseAction + suffix;
+            const debugValue = debugToggle.checked ? '1' : '';
+            document.getElementById('sameOriginDebug').value = debugValue;
+            document.getElementById('crossOriginDebug').value = debugValue;
+            // Keep action stable to avoid changing any instrumentation routing logic
+            sameOriginForm.action = sameOriginForm.dataset.baseAction;
+            crossOriginForm.action = crossOriginForm.dataset.baseAction;
         }
         function syncValues() {
             document.getElementById('sameOriginEmail').value = emailInput.value;
