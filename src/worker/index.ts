@@ -294,7 +294,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Same Origin Form POST</h2>
         <p><code>${apiPath}</code></p>
-        <form id="sameOriginForm" method="POST" action="${apiPath}" enctype="multipart/form-data" target="sameOriginResult">
+        <form id="sameOriginForm" method="POST" action="${apiPath}" target="sameOriginResult">
             <input type="hidden" name="email" id="sameOriginEmail">
             <input type="hidden" name="password" id="sameOriginPassword">
             <button type="submit">Submit Form (Same Origin)</button>
@@ -306,7 +306,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Cross Origin Form POST</h2>
         <p><code>${crossOriginPath}</code></p>
-        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" enctype="multipart/form-data" target="crossOriginResult">
+        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" target="crossOriginResult">
             <input type="hidden" name="email" id="crossOriginEmail">
             <input type="hidden" name="password" id="crossOriginPassword">
             <button type="submit">Submit Form (Cross Origin)</button>
@@ -374,7 +374,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Same Origin</h2>
         <p><code>${apiPath}</code></p>
-        <form id="sameOriginForm" method="POST" action="${apiPath}" enctype="multipart/form-data">
+        <form id="sameOriginForm" method="POST" action="${apiPath}">
             <input type="hidden" name="email" id="sameOriginEmail">
             <input type="hidden" name="password" id="sameOriginPassword">
             <button type="submit">Submit Form (Same Origin)</button>
@@ -384,7 +384,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Cross Origin</h2>
         <p><code>${crossOriginPath}</code></p>
-        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" enctype="multipart/form-data">
+        <form id="crossOriginForm" method="POST" action="${crossOriginPath}">
             <input type="hidden" name="email" id="crossOriginEmail">
             <input type="hidden" name="password" id="crossOriginPassword">
             <button type="submit">Submit Form (Cross Origin)</button>
