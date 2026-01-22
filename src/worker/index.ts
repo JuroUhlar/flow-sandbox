@@ -90,6 +90,7 @@ const handleFormSubmission = async (c: AppContext) => {
 		let rawBodyHasMultipartEmail = false;
 		let rawBodyHasMultipartPassword = false;
 		let rawBodyHasFpData = false;
+		let rawBodyHasMultipartFpData = false;
 		let multipartBoundaryFromBody: string | null = null;
 		let rawTextForFallback: string | null = null;
 		try {
@@ -102,6 +103,7 @@ const handleFormSubmission = async (c: AppContext) => {
 			rawBodyHasMultipartEmail = rawText.includes('name="email"');
 			rawBodyHasMultipartPassword = rawText.includes('name="password"');
 			rawBodyHasFpData = rawText.includes("fp-data=");
+			rawBodyHasMultipartFpData = rawText.includes('name="fp-data"');
 
 			if (rawBodyLooksMultipart) {
 				const firstLine = rawText.split("\n", 1)[0]?.trimEnd() ?? "";
@@ -137,6 +139,7 @@ const handleFormSubmission = async (c: AppContext) => {
 					hasMultipartEmail: rawBodyHasMultipartEmail,
 					hasMultipartPassword: rawBodyHasMultipartPassword,
 					hasFpData: rawBodyHasFpData,
+					hasMultipartFpData: rawBodyHasMultipartFpData,
 					multipartBoundaryFromBody,
 				},
 			}),
