@@ -50,20 +50,83 @@ function App() {
 		}
 	};
 
-	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+	const handleFetchSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		await submitRequest(false);
 	};
 
-	const handleCrossOriginSubmit = async () => {
+	const handleFetchCrossOrigin = async () => {
 		await submitRequest(true);
+	};
+
+	// XHR request handler
+	const submitXhr = (crossOrigin: boolean) => {
+		setError("");
+		setLoading(true);
+		setSuccess(false);
+
+		const pathSegment = getPathSegment();
+		const apiPath = pathSegment ? `/${pathSegment}/api/create-account` : "/api/create-account";
+		const url = crossOrigin ? `${CROSS_ORIGIN_BASE}${apiPath}` : apiPath;
+
+		const xhr = new XMLHttpRequest();
+		xhr.open("POST", url, true);
+		xhr.setRequestHeader("Content-Type", "application/json");
+
+		xhr.onload = () => {
+			setLoading(false);
+			try {
+				const data = JSON.parse(xhr.responseText);
+				if (xhr.status >= 200 && xhr.status < 300) {
+					setSuccess(true);
+				} else {
+					setError(data.message || "Login failed");
+				}
+			} catch {
+				setError("Failed to parse response");
+			}
+		};
+
+		xhr.onerror = () => {
+			setLoading(false);
+			setError("Network error. Please try again.");
+		};
+
+		xhr.send(JSON.stringify({ email, password }));
+	};
+
+	// Form submission handler (navigates away from page)
+	const submitForm = (crossOrigin: boolean) => {
+		const pathSegment = getPathSegment();
+		const apiPath = pathSegment ? `/${pathSegment}/api/create-account` : "/api/create-account";
+		const url = crossOrigin ? `${CROSS_ORIGIN_BASE}${apiPath}` : apiPath;
+
+		const form = document.createElement("form");
+		form.method = "POST";
+		form.action = url;
+		form.enctype = "application/x-www-form-urlencoded";
+
+		const emailInput = document.createElement("input");
+		emailInput.type = "hidden";
+		emailInput.name = "email";
+		emailInput.value = email;
+		form.appendChild(emailInput);
+
+		const passwordInput = document.createElement("input");
+		passwordInput.type = "hidden";
+		passwordInput.name = "password";
+		passwordInput.value = password;
+		form.appendChild(passwordInput);
+
+		document.body.appendChild(form);
+		form.submit();
 	};
 
 	return (
 		<div className="login-container">
 			<div className="login-card">
 				<h1>Sign up</h1>
-				<form onSubmit={handleSubmit}>
+				<form onSubmit={handleFetchSubmit}>
 					<div className="form-group">
 						<label htmlFor="email">Email</label>
 						<input
@@ -90,16 +153,54 @@ function App() {
 						{error && <div className="error-message">{error}</div>}
 						{success && <div className="success-message">Account created successfully!</div>}
 					</div>
+
+					<h3>Fetch</h3>
 					<button type="submit" disabled={loading} className="login-button">
-						{loading ? "Creating account..." : "Create account"}
+						{loading ? "Creating account..." : "Same origin"}
 					</button>
 					<button
 						type="button"
 						disabled={loading}
 						className="login-button"
-						onClick={handleCrossOriginSubmit}
+						onClick={handleFetchCrossOrigin}
 					>
-						{loading ? "Creating account..." : "Sign up cross origin"}
+						Cross origin
+					</button>
+
+					<h3>XHR</h3>
+					<button
+						type="button"
+						disabled={loading}
+						className="login-button"
+						onClick={() => submitXhr(false)}
+					>
+						Same origin
+					</button>
+					<button
+						type="button"
+						disabled={loading}
+						className="login-button"
+						onClick={() => submitXhr(true)}
+					>
+						Cross origin
+					</button>
+
+					<h3>Form submission</h3>
+					<button
+						type="button"
+						disabled={loading}
+						className="login-button"
+						onClick={() => submitForm(false)}
+					>
+						Same origin
+					</button>
+					<button
+						type="button"
+						disabled={loading}
+						className="login-button"
+						onClick={() => submitForm(true)}
+					>
+						Cross origin
 					</button>
 				</form>
 			</div>

@@ -8,10 +8,37 @@ const app = new Hono<{ Bindings: Env }>();
 // Enable CORS for cross-origin requests
 app.use("*", cors());
 
+// Parse request body based on content type (JSON or form data)
+const parseRequestBody = async (c: AppContext): Promise<{ email: string; password: string }> => {
+	const contentType = (c.req.header("content-type") ?? "").toLowerCase();
+
+	console.log("Content-Type:", contentType);
+
+	if (contentType.includes("application/json")) {
+		return await c.req.json();
+	}
+
+	// Form submissions (default to form parsing if no content-type or form-urlencoded)
+	if (
+		contentType.includes("application/x-www-form-urlencoded") ||
+		contentType.includes("multipart/form-data") ||
+		contentType === ""
+	) {
+		const formData = await c.req.parseBody();
+		console.log("Parsed form data:", formData);
+		return {
+			email: String(formData.email ?? ""),
+			password: String(formData.password ?? ""),
+		};
+	}
+
+	throw new Error(`Unsupported content type: ${contentType}`);
+};
+
 // Handle login API route handler (shared logic)
 const handleLogin = async (c: AppContext, pathSegment?: string) => {
 	try {
-		const body = await c.req.json() as { email: string; password: string };
+		const body = await parseRequestBody(c);
 
 		if (!body.email || !body.password) {
 			return c.json({ message: "Email and password are required" }, 400);
