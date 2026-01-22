@@ -73,11 +73,88 @@ const handleFormSubmission = async (c: AppContext) => {
 	const navigatePage = `${basePath}/form-test-navigate.html`;
 
 	try {
+		const reqId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+		const contentType = c.req.header("content-type") ?? "";
+		const contentLength = c.req.header("content-length") ?? "";
+		const secFetchMode = c.req.header("sec-fetch-mode") ?? "";
+		const secFetchDest = c.req.header("sec-fetch-dest") ?? "";
+		const secFetchSite = c.req.header("sec-fetch-site") ?? "";
+		const origin = c.req.header("origin") ?? "";
+		const referer = c.req.header("referer") ?? "";
+
+		// IMPORTANT: don't log sensitive values
+		let rawBodyLength: number | null = null;
+		let rawBodyHasEmail = false;
+		let rawBodyHasPassword = false;
+		let rawBodyHasFpData = false;
+		try {
+			const rawText = await c.req.raw.clone().text();
+			rawBodyLength = rawText.length;
+			rawBodyHasEmail = rawText.includes("email=");
+			rawBodyHasPassword = rawText.includes("password=");
+			rawBodyHasFpData = rawText.includes("fp-data=");
+		} catch {
+			// ignore body-clone failures
+		}
+
+		console.log(
+			"[form-submit] start",
+			JSON.stringify({
+				reqId,
+				pathSegment,
+				method: c.req.method,
+				url: c.req.url,
+				headers: {
+					"content-type": contentType,
+					"content-length": contentLength,
+					"sec-fetch-mode": secFetchMode,
+					"sec-fetch-dest": secFetchDest,
+					"sec-fetch-site": secFetchSite,
+					origin,
+					referer,
+				},
+				rawBody: {
+					length: rawBodyLength,
+					hasEmail: rawBodyHasEmail,
+					hasPassword: rawBodyHasPassword,
+					hasFpData: rawBodyHasFpData,
+				},
+			}),
+		);
+
 		const formData = await c.req.parseBody();
 		const email = String(formData.email ?? "");
 		const password = String(formData.password ?? "");
+		const fpData = String(formData["fp-data"] ?? "");
+
+		console.log(
+			"[form-submit] parsed",
+			JSON.stringify({
+				reqId,
+				pathSegment,
+				keys: Object.keys(formData).sort(),
+				emailPresent: email.length > 0,
+				emailLength: email.length,
+				passwordPresent: password.length > 0,
+				passwordLength: password.length,
+				fpDataPresent: fpData.length > 0,
+				fpDataLength: fpData.length,
+			}),
+		);
 
 		if (!email || !password) {
+			console.log(
+				"[form-submit] missing-fields",
+				JSON.stringify({
+					reqId,
+					pathSegment,
+					keys: Object.keys(formData).sort(),
+					emailPresent: email.length > 0,
+					passwordPresent: password.length > 0,
+					fpDataPresent: fpData.length > 0,
+					fpDataLength: fpData.length,
+				}),
+			);
 			return c.html(`
 				<!DOCTYPE html>
 				<html>
@@ -103,6 +180,13 @@ const handleFormSubmission = async (c: AppContext) => {
 			</html>
 		`);
 	} catch (error) {
+		console.log(
+			"[form-submit] error",
+			JSON.stringify({
+				pathSegment,
+				message: error instanceof Error ? error.message : String(error),
+			}),
+		);
 		return c.html(`
 			<!DOCTYPE html>
 			<html>
