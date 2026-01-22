@@ -66,6 +66,12 @@ app.post("/api/create-account", async (c) => {
 
 // Dedicated form submission endpoint - returns HTML for browser display
 const handleFormSubmission = async (c: AppContext) => {
+	// Extract path segment from URL if present
+	const pathSegment = c.req.param("pathSegment") ?? "";
+	const basePath = pathSegment ? `/${pathSegment}` : "";
+	const iframePage = `${basePath}/form-test.html`;
+	const navigatePage = `${basePath}/form-test-navigate.html`;
+
 	try {
 		const formData = await c.req.parseBody();
 		const email = String(formData.email ?? "");
@@ -79,7 +85,7 @@ const handleFormSubmission = async (c: AppContext) => {
 				<body>
 					<h1>Error</h1>
 					<p>Email and password are required</p>
-					<p><a href="/form-test.html">← Back (iframe)</a> | <a href="/form-test-navigate.html">← Back (navigate)</a></p>
+					<p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
 				</body>
 				</html>
 			`, 400);
@@ -92,7 +98,7 @@ const handleFormSubmission = async (c: AppContext) => {
 			<body>
 				<h1>Account Created Successfully!</h1>
 				<p>Email: ${email}</p>
-				<p><a href="/form-test.html">← Back (iframe)</a> | <a href="/form-test-navigate.html">← Back (navigate)</a></p>
+				<p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
 			</body>
 			</html>
 		`);
@@ -104,7 +110,7 @@ const handleFormSubmission = async (c: AppContext) => {
 			<body>
 				<h1>Error</h1>
 				<p>${error instanceof Error ? error.message : "Unknown error"}</p>
-				<p><a href="/form-test.html">← Back (iframe)</a> | <a href="/form-test-navigate.html">← Back (navigate)</a></p>
+				<p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
 			</body>
 			</html>
 		`, 400);
@@ -113,6 +119,181 @@ const handleFormSubmission = async (c: AppContext) => {
 
 app.post("/form-api/create-account", handleFormSubmission);
 app.post("/__forms/create-account", handleFormSubmission);
+app.post("/:pathSegment/__forms/create-account", handleFormSubmission);
+
+// Form test page HTML generator
+const CROSS_ORIGIN_BASE = "https://flow-2.jurajuhlar.site";
+
+const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
+	const apiPath = pathSegment ? `/${pathSegment}/__forms/create-account` : "/__forms/create-account";
+	const crossOriginPath = `${CROSS_ORIGIN_BASE}${apiPath}`;
+	const currentPath = pathSegment ? `/${pathSegment}` : "";
+	const iframePage = `${currentPath}/form-test.html`;
+	const navigatePage = `${currentPath}/form-test-navigate.html`;
+	const mainApp = `${currentPath}/`;
+
+	if (useIframe) {
+		return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Submission Test (Iframe)</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="email"], input[type="password"] { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        h2 { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 20px; }
+        .result-frame { width: 100%; height: 200px; border: 2px solid #333; margin-top: 10px; background: #f5f5f5; }
+        .section { margin-bottom: 40px; }
+        code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Form Submission Test (Iframe)</h1>
+    <p>Path segment: <strong>${pathSegment || "(none)"}</strong></p>
+    
+    <div class="nav" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
+        <a href="${mainApp}">← Main App</a>
+        <a href="${navigatePage}">Navigate Version (no iframe)</a>
+    </div>
+
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" value="user@example.com">
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" value="password123">
+    </div>
+
+    <div class="section">
+        <h2>Same Origin Form POST</h2>
+        <p><code>${apiPath}</code></p>
+        <form id="sameOriginForm" method="POST" action="${apiPath}" target="sameOriginResult">
+            <input type="hidden" name="email" id="sameOriginEmail">
+            <input type="hidden" name="password" id="sameOriginPassword">
+            <button type="submit">Submit Form (Same Origin)</button>
+        </form>
+        <p>Result:</p>
+        <iframe name="sameOriginResult" class="result-frame"></iframe>
+    </div>
+
+    <div class="section">
+        <h2>Cross Origin Form POST</h2>
+        <p><code>${crossOriginPath}</code></p>
+        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" target="crossOriginResult">
+            <input type="hidden" name="email" id="crossOriginEmail">
+            <input type="hidden" name="password" id="crossOriginPassword">
+            <button type="submit">Submit Form (Cross Origin)</button>
+        </form>
+        <p>Result:</p>
+        <iframe name="crossOriginResult" class="result-frame"></iframe>
+    </div>
+
+    <script>
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        function syncValues() {
+            document.getElementById('sameOriginEmail').value = emailInput.value;
+            document.getElementById('sameOriginPassword').value = passwordInput.value;
+            document.getElementById('crossOriginEmail').value = emailInput.value;
+            document.getElementById('crossOriginPassword').value = passwordInput.value;
+        }
+        emailInput.addEventListener('input', syncValues);
+        passwordInput.addEventListener('input', syncValues);
+        document.getElementById('sameOriginForm').addEventListener('submit', syncValues);
+        document.getElementById('crossOriginForm').addEventListener('submit', syncValues);
+        syncValues();
+    </script>
+</body>
+</html>`;
+	} else {
+		return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Submission Test (Navigate)</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="email"], input[type="password"] { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { padding: 10px 20px; margin: 5px 5px 5px 0; cursor: pointer; }
+        .section { margin: 30px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        h2 { margin-top: 0; }
+        .nav { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #ccc; }
+        .nav a { margin-right: 15px; }
+        code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Form Submission Test (Navigate)</h1>
+    <p>Path segment: <strong>${pathSegment || "(none)"}</strong></p>
+    <p>These forms navigate away from the page when submitted. Use browser back button to return.</p>
+    
+    <div class="nav">
+        <a href="${mainApp}">← Main App</a>
+        <a href="${iframePage}">Iframe Version</a>
+    </div>
+
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" value="user@example.com">
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" value="password123">
+    </div>
+
+    <div class="section">
+        <h2>Same Origin</h2>
+        <p><code>${apiPath}</code></p>
+        <form id="sameOriginForm" method="POST" action="${apiPath}">
+            <input type="hidden" name="email" id="sameOriginEmail">
+            <input type="hidden" name="password" id="sameOriginPassword">
+            <button type="submit">Submit Form (Same Origin)</button>
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>Cross Origin</h2>
+        <p><code>${crossOriginPath}</code></p>
+        <form id="crossOriginForm" method="POST" action="${crossOriginPath}">
+            <input type="hidden" name="email" id="crossOriginEmail">
+            <input type="hidden" name="password" id="crossOriginPassword">
+            <button type="submit">Submit Form (Cross Origin)</button>
+        </form>
+    </div>
+
+    <script>
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        function syncValues() {
+            document.getElementById('sameOriginEmail').value = emailInput.value;
+            document.getElementById('sameOriginPassword').value = passwordInput.value;
+            document.getElementById('crossOriginEmail').value = emailInput.value;
+            document.getElementById('crossOriginPassword').value = passwordInput.value;
+        }
+        emailInput.addEventListener('input', syncValues);
+        passwordInput.addEventListener('input', syncValues);
+        document.getElementById('sameOriginForm').addEventListener('submit', syncValues);
+        document.getElementById('crossOriginForm').addEventListener('submit', syncValues);
+        syncValues();
+    </script>
+</body>
+</html>`;
+	}
+};
+
+// Serve form test pages (with path segment support)
+app.get("/form-test.html", (c) => c.html(generateFormTestPage("", true)));
+app.get("/form-test-navigate.html", (c) => c.html(generateFormTestPage("", false)));
+app.get("/:pathSegment/form-test.html", (c) => c.html(generateFormTestPage(c.req.param("pathSegment"), true)));
+app.get("/:pathSegment/form-test-navigate.html", (c) => c.html(generateFormTestPage(c.req.param("pathSegment"), false)));
 
 // All other routes will be handled by Cloudflare's static asset serving
 // which will serve the client app (SPA mode) for any path segment

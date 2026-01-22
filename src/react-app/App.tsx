@@ -17,6 +17,9 @@ function App() {
 		return segments[0] || "";
 	};
 
+	const pathSegment = getPathSegment();
+	const basePath = pathSegment ? `/${pathSegment}` : "";
+
 	const submitRequest = async (crossOrigin: boolean) => {
 		setError("");
 		setLoading(true);
@@ -161,9 +164,9 @@ function App() {
 
 					<h3>Form submission</h3>
 					<p>
-						<a href="/form-test.html">Form Test (iframe)</a>
+						<a href={`${basePath}/form-test.html`}>Form Test (iframe)</a>
 						{" | "}
-						<a href="/form-test-navigate.html">Form Test (navigate)</a>
+						<a href={`${basePath}/form-test-navigate.html`}>Form Test (navigate)</a>
 					</p>
 				</form>
 			</div>

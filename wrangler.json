@@ -11,6 +11,6 @@
 	"assets": {
 		"directory": "./dist/client",
 		"not_found_handling": "single-page-application",
-		"run_worker_first": ["/api/*", "/form-api/*", "/__forms/*", "/*/api/*"]
+		"run_worker_first": ["/api/*", "/form-api/*", "/__forms/*", "/*/api/*", "/*/__forms/*", "/form-test.html", "/form-test-navigate.html", "/*/form-test.html", "/*/form-test-navigate.html"]
 	}
 }
