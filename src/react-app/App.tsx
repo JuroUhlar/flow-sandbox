@@ -95,32 +95,6 @@ function App() {
 		xhr.send(JSON.stringify({ email, password }));
 	};
 
-	// Form submission handler (navigates away from page)
-	const submitForm = (crossOrigin: boolean) => {
-		const pathSegment = getPathSegment();
-		const apiPath = pathSegment ? `/${pathSegment}/api/create-account` : "/api/create-account";
-		const url = crossOrigin ? `${CROSS_ORIGIN_BASE}${apiPath}` : apiPath;
-
-		const form = document.createElement("form");
-		form.method = "POST";
-		form.action = url;
-		form.enctype = "application/x-www-form-urlencoded";
-
-		const emailInput = document.createElement("input");
-		emailInput.type = "hidden";
-		emailInput.name = "email";
-		emailInput.value = email;
-		form.appendChild(emailInput);
-
-		const passwordInput = document.createElement("input");
-		passwordInput.type = "hidden";
-		passwordInput.name = "password";
-		passwordInput.value = password;
-		form.appendChild(passwordInput);
-
-		document.body.appendChild(form);
-		form.submit();
-	};
 
 	return (
 		<div className="login-container">
@@ -186,22 +160,11 @@ function App() {
 					</button>
 
 					<h3>Form submission</h3>
-					<button
-						type="button"
-						disabled={loading}
-						className="login-button"
-						onClick={() => submitForm(false)}
-					>
-						Same origin
-					</button>
-					<button
-						type="button"
-						disabled={loading}
-						className="login-button"
-						onClick={() => submitForm(true)}
-					>
-						Cross origin
-					</button>
+					<p>
+						<a href="/form-test.html">Form Test (iframe)</a>
+						{" | "}
+						<a href="/form-test-navigate.html">Form Test (navigate)</a>
+					</p>
 				</form>
 			</div>
 		</div>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Submission Test (Navigate)</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px 5px 5px 0;
+            cursor: pointer;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        .nav {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ccc;
+        }
+        .nav a {
+            margin-right: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Form Submission Test (Navigate)</h1>
+    <p>These forms navigate away from the page when submitted. Use browser back button to return.</p>
+    
+    <div class="nav">
+        <a href="/">← Main App</a>
+        <a href="/form-test.html">Iframe Version</a>
+    </div>
+
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" value="user@example.com">
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" value="password123">
+    </div>
+
+    <div class="section">
+        <h2>Same Origin</h2>
+        <form id="sameOriginForm" method="POST" action="/__forms/create-account">
+            <input type="hidden" name="email" id="sameOriginEmail">
+            <input type="hidden" name="password" id="sameOriginPassword">
+            <button type="submit">Submit Form (Same Origin)</button>
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>Cross Origin</h2>
+        <form id="crossOriginForm" method="POST" action="https://flow-2.jurajuhlar.site/__forms/create-account">
+            <input type="hidden" name="email" id="crossOriginEmail">
+            <input type="hidden" name="password" id="crossOriginPassword">
+            <button type="submit">Submit Form (Cross Origin)</button>
+        </form>
+    </div>
+
+    <script>
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+
+        function syncValues() {
+            document.getElementById('sameOriginEmail').value = emailInput.value;
+            document.getElementById('sameOriginPassword').value = passwordInput.value;
+            document.getElementById('crossOriginEmail').value = emailInput.value;
+            document.getElementById('crossOriginPassword').value = passwordInput.value;
+        }
+
+        emailInput.addEventListener('input', syncValues);
+        passwordInput.addEventListener('input', syncValues);
+        document.getElementById('sameOriginForm').addEventListener('submit', syncValues);
+        document.getElementById('crossOriginForm').addEventListener('submit', syncValues);
+        syncValues();
+    </script>
+</body>
+</html>

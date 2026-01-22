@@ -12,8 +12,6 @@ app.use("*", cors());
 const parseRequestBody = async (c: AppContext): Promise<{ email: string; password: string }> => {
 	const contentType = (c.req.header("content-type") ?? "").toLowerCase();
 
-	console.log("Content-Type:", contentType);
-
 	if (contentType.includes("application/json")) {
 		return await c.req.json();
 	}
@@ -25,7 +23,6 @@ const parseRequestBody = async (c: AppContext): Promise<{ email: string; passwor
 		contentType === ""
 	) {
 		const formData = await c.req.parseBody();
-		console.log("Parsed form data:", formData);
 		return {
 			email: String(formData.email ?? ""),
 			password: String(formData.password ?? ""),
@@ -66,6 +63,56 @@ app.post("/:pathSegment/api/create-account", async (c) => {
 app.post("/api/create-account", async (c) => {
 	return handleLogin(c);
 });
+
+// Dedicated form submission endpoint - returns HTML for browser display
+const handleFormSubmission = async (c: AppContext) => {
+	try {
+		const formData = await c.req.parseBody();
+		const email = String(formData.email ?? "");
+		const password = String(formData.password ?? "");
+
+		if (!email || !password) {
+			return c.html(`
+				<!DOCTYPE html>
+				<html>
+				<head><title>Error</title></head>
+				<body>
+					<h1>Error</h1>
+					<p>Email and password are required</p>
+					<p><a href="/form-test.html">← Back (iframe)</a> | <a href="/form-test-navigate.html">← Back (navigate)</a></p>
+				</body>
+				</html>
+			`, 400);
+		}
+
+		return c.html(`
+			<!DOCTYPE html>
+			<html>
+			<head><title>Success</title></head>
+			<body>
+				<h1>Account Created Successfully!</h1>
+				<p>Email: ${email}</p>
+				<p><a href="/form-test.html">← Back (iframe)</a> | <a href="/form-test-navigate.html">← Back (navigate)</a></p>
+			</body>
+			</html>
+		`);
+	} catch (error) {
+		return c.html(`
+			<!DOCTYPE html>
+			<html>
+			<head><title>Error</title></head>
+			<body>
+				<h1>Error</h1>
+				<p>${error instanceof Error ? error.message : "Unknown error"}</p>
+				<p><a href="/form-test.html">← Back (iframe)</a> | <a href="/form-test-navigate.html">← Back (navigate)</a></p>
+			</body>
+			</html>
+		`, 400);
+	}
+};
+
+app.post("/form-api/create-account", handleFormSubmission);
+app.post("/__forms/create-account", handleFormSubmission);
 
 // All other routes will be handled by Cloudflare's static asset serving
 // which will serve the client app (SPA mode) for any path segment
