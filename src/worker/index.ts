@@ -154,6 +154,49 @@ const handleFormSubmission = async (c: AppContext) => {
 		}
 
 		if (!email || !password) {
+			const referer = c.req.header("referer") ?? "";
+			const showAutoDebug = referer.includes("/form-test") || referer.includes("/form-test-navigate");
+			const redactedRawText = rawText
+				.replace(/email=[^&]*/i, "email=[redacted]")
+				.replace(/password=[^&]*/i, "password=[redacted]");
+
+			const autoDebug = showAutoDebug
+				? `<details>
+  <summary>Debug info</summary>
+  <pre>${escapeHtml(
+		JSON.stringify(
+			{
+				headers: {
+					"content-type": c.req.header("content-type") ?? "",
+					"content-length": c.req.header("content-length") ?? "",
+					"sec-fetch-mode": c.req.header("sec-fetch-mode") ?? "",
+					"sec-fetch-dest": c.req.header("sec-fetch-dest") ?? "",
+					"sec-fetch-site": c.req.header("sec-fetch-site") ?? "",
+					"origin": c.req.header("origin") ?? "",
+					"referer": referer,
+				},
+				rawBody: {
+					length: rawText.length,
+					preview: redactedRawText.slice(0, 400),
+					containsEmailKey: rawText.includes("email="),
+					containsPasswordKey: rawText.includes("password="),
+					containsFpDataKey: rawText.includes("fp-data="),
+					containsDebugKey: rawText.includes("debug=1"),
+				},
+				parsed: {
+					keys: Object.keys(formData).sort(),
+					emailLength: email.length,
+					passwordLength: password.length,
+					fpDataLength: fpData.length,
+				},
+			},
+			null,
+			2,
+		),
+  )}</pre>
+</details>`
+				: "";
+
 			return c.html(
 				`<!DOCTYPE html>
 <html>
@@ -161,6 +204,7 @@ const handleFormSubmission = async (c: AppContext) => {
 <body>
   <h1>Error</h1>
   <p>Email and password are required</p>
+  ${autoDebug}
   <p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
 </body>
 </html>`,
