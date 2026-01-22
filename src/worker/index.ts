@@ -91,6 +91,7 @@ const handleFormSubmission = async (c: AppContext) => {
 		let rawBodyHasMultipartPassword = false;
 		let rawBodyHasFpData = false;
 		let rawBodyHasMultipartFpData = false;
+		let rawBodyHasFpDataSubstring = false;
 		let multipartBoundaryFromBody: string | null = null;
 		let rawTextForFallback: string | null = null;
 		try {
@@ -104,6 +105,7 @@ const handleFormSubmission = async (c: AppContext) => {
 			rawBodyHasMultipartPassword = rawText.includes('name="password"');
 			rawBodyHasFpData = rawText.includes("fp-data=");
 			rawBodyHasMultipartFpData = rawText.includes('name="fp-data"');
+			rawBodyHasFpDataSubstring = rawText.includes("fp-data");
 
 			if (rawBodyLooksMultipart) {
 				const firstLine = rawText.split("\n", 1)[0]?.trimEnd() ?? "";
@@ -140,10 +142,24 @@ const handleFormSubmission = async (c: AppContext) => {
 					hasMultipartPassword: rawBodyHasMultipartPassword,
 					hasFpData: rawBodyHasFpData,
 					hasMultipartFpData: rawBodyHasMultipartFpData,
+					hasFpDataSubstring: rawBodyHasFpDataSubstring,
 					multipartBoundaryFromBody,
 				},
 			}),
 		);
+
+		if (rawBodyLooksMultipart && contentType.includes("application/x-www-form-urlencoded")) {
+			console.log(
+				"[form-submit] header-body-mismatch",
+				JSON.stringify({
+					reqId,
+					pathSegment,
+					headerContentType: contentType,
+					bodyLooksMultipart: true,
+					multipartBoundaryFromBody,
+				}),
+			);
+		}
 
 		const parseMultipartFromRaw = (rawText: string): Record<string, string> | null => {
 			// Very small, tolerant multipart parser that does NOT rely on Content-Type boundary.
@@ -199,6 +215,9 @@ const handleFormSubmission = async (c: AppContext) => {
 		const email = String((effective as Record<string, unknown>).email ?? "");
 		const password = String((effective as Record<string, unknown>).password ?? "");
 		const fpData = String((effective as Record<string, unknown>)["fp-data"] ?? "");
+		const fallbackFieldLengths = fallback
+			? Object.fromEntries(Object.entries(fallback).map(([k, v]) => [k, v.length]))
+			: {};
 
 		console.log(
 			"[form-submit] parsed",
@@ -208,6 +227,7 @@ const handleFormSubmission = async (c: AppContext) => {
 				keys: Object.keys(formData).sort(),
 				fallbackUsed: Boolean(fallback),
 				fallbackKeys: fallback ? Object.keys(fallback).sort() : [],
+				fallbackFieldLengths,
 				emailPresent: email.length > 0,
 				emailLength: email.length,
 				passwordPresent: password.length > 0,
