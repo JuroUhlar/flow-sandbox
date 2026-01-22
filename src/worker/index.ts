@@ -66,54 +66,124 @@ app.post("/api/create-account", async (c) => {
 
 // Dedicated form submission endpoint - returns HTML for browser display
 const handleFormSubmission = async (c: AppContext) => {
-	// Extract path segment from URL if present
-	const pathSegment = c.req.param("pathSegment") ?? "";
+	const debug = c.req.query("debug") === "1";
+
+	// Extract path segment from URL if present (route may or may not define it)
+	const pathSegment = (() => {
+		try {
+			return c.req.param("pathSegment");
+		} catch {
+			return "";
+		}
+	})();
+
 	const basePath = pathSegment ? `/${pathSegment}` : "";
 	const iframePage = `${basePath}/form-test.html`;
 	const navigatePage = `${basePath}/form-test-navigate.html`;
 
+	const escapeHtml = (input: string) =>
+		input.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;");
+
 	try {
+		// Clone is important: reading body consumes the stream
+		const rawText = await c.req.raw.clone().text();
 		const formData = await c.req.parseBody();
+
 		const email = String(formData.email ?? "");
 		const password = String(formData.password ?? "");
+		const fpData = String(formData["fp-data"] ?? "");
 
-		if (!email || !password) {
-			return c.html(`
-				<!DOCTYPE html>
-				<html>
-				<head><title>Error</title></head>
-				<body>
-					<h1>Error</h1>
-					<p>Email and password are required</p>
-					<p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
-				</body>
-				</html>
-			`, 400);
+		if (debug) {
+			const headers = {
+				"content-type": c.req.header("content-type") ?? "",
+				"content-length": c.req.header("content-length") ?? "",
+				"sec-fetch-mode": c.req.header("sec-fetch-mode") ?? "",
+				"sec-fetch-dest": c.req.header("sec-fetch-dest") ?? "",
+				"sec-fetch-site": c.req.header("sec-fetch-site") ?? "",
+				"origin": c.req.header("origin") ?? "",
+				"referer": c.req.header("referer") ?? "",
+				"user-agent": c.req.header("user-agent") ?? "",
+			} as const;
+
+			const redactedRawText = rawText
+				.replace(/email=[^&]*/i, "email=[redacted]")
+				.replace(/password=[^&]*/i, "password=[redacted]");
+
+			const debugInfo = {
+				pathSegment,
+				method: c.req.method,
+				url: c.req.url,
+				headers,
+				rawBody: {
+					length: rawText.length,
+					preview: redactedRawText.slice(0, 400),
+					containsEmailKey: rawText.includes("email="),
+					containsPasswordKey: rawText.includes("password="),
+					containsFpDataKey: rawText.includes("fp-data="),
+				},
+				parsed: {
+					keys: Object.keys(formData).sort(),
+					emailPresent: email.length > 0,
+					emailLength: email.length,
+					passwordPresent: password.length > 0,
+					passwordLength: password.length,
+					fpDataPresent: fpData.length > 0,
+					fpDataLength: fpData.length,
+				},
+			};
+
+			return c.html(
+				`<!DOCTYPE html>
+<html>
+<head><title>Debug</title></head>
+<body>
+  <h1>Debug: /__forms/create-account</h1>
+  <p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
+  <pre>${escapeHtml(JSON.stringify(debugInfo, null, 2))}</pre>
+</body>
+</html>`,
+			);
 		}
 
-		return c.html(`
-			<!DOCTYPE html>
-			<html>
-			<head><title>Success</title></head>
-			<body>
-				<h1>Account Created Successfully!</h1>
-				<p>Email: ${email}</p>
-				<p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
-			</body>
-			</html>
-		`);
+		if (!email || !password) {
+			return c.html(
+				`<!DOCTYPE html>
+<html>
+<head><title>Error</title></head>
+<body>
+  <h1>Error</h1>
+  <p>Email and password are required</p>
+  <p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
+</body>
+</html>`,
+				400,
+			);
+		}
+
+		return c.html(
+			`<!DOCTYPE html>
+<html>
+<head><title>Success</title></head>
+<body>
+  <h1>Account Created Successfully!</h1>
+  <p>Email: ${escapeHtml(email)}</p>
+  <p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
+</body>
+</html>`,
+		);
 	} catch (error) {
-		return c.html(`
-			<!DOCTYPE html>
-			<html>
-			<head><title>Error</title></head>
-			<body>
-				<h1>Error</h1>
-				<p>${error instanceof Error ? error.message : "Unknown error"}</p>
-				<p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
-			</body>
-			</html>
-		`, 400);
+		return c.html(
+			`<!DOCTYPE html>
+<html>
+<head><title>Error</title></head>
+<body>
+  <h1>Error</h1>
+  <p>${escapeHtml(error instanceof Error ? error.message : "Unknown error")}</p>
+  <p><a href="${iframePage}">← Back (iframe)</a> | <a href="${navigatePage}">← Back (navigate)</a></p>
+</body>
+</html>`,
+			400,
+		);
 	}
 };
 
@@ -154,6 +224,10 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
 <body>
     <h1>Form Submission Test (Iframe)</h1>
     <p>Path segment: <strong>${pathSegment || "(none)"}</strong></p>
+    <label style="display:inline-flex; align-items:center; gap:8px; margin: 10px 0 0;">
+        <input type="checkbox" id="debugToggle">
+        Submit with <code>?debug=1</code>
+    </label>
     
     <div class="nav" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
         <a href="${mainApp}">← Main App</a>
@@ -172,7 +246,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Same Origin Form POST</h2>
         <p><code>${apiPath}</code></p>
-        <form id="sameOriginForm" method="POST" action="${apiPath}" target="sameOriginResult">
+        <form id="sameOriginForm" method="POST" action="${apiPath}" data-base-action="${apiPath}" target="sameOriginResult">
             <input type="hidden" name="email" id="sameOriginEmail">
             <input type="hidden" name="password" id="sameOriginPassword">
             <button type="submit">Submit Form (Same Origin)</button>
@@ -184,7 +258,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Cross Origin Form POST</h2>
         <p><code>${crossOriginPath}</code></p>
-        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" target="crossOriginResult">
+        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" data-base-action="${crossOriginPath}" target="crossOriginResult">
             <input type="hidden" name="email" id="crossOriginEmail">
             <input type="hidden" name="password" id="crossOriginPassword">
             <button type="submit">Submit Form (Cross Origin)</button>
@@ -196,6 +270,15 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <script>
         const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
+        const debugToggle = document.getElementById('debugToggle');
+        const sameOriginForm = document.getElementById('sameOriginForm');
+        const crossOriginForm = document.getElementById('crossOriginForm');
+
+        function updateActions() {
+            const suffix = debugToggle.checked ? '?debug=1' : '';
+            sameOriginForm.action = sameOriginForm.dataset.baseAction + suffix;
+            crossOriginForm.action = crossOriginForm.dataset.baseAction + suffix;
+        }
         function syncValues() {
             document.getElementById('sameOriginEmail').value = emailInput.value;
             document.getElementById('sameOriginPassword').value = passwordInput.value;
@@ -204,9 +287,11 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
         }
         emailInput.addEventListener('input', syncValues);
         passwordInput.addEventListener('input', syncValues);
-        document.getElementById('sameOriginForm').addEventListener('submit', syncValues);
-        document.getElementById('crossOriginForm').addEventListener('submit', syncValues);
+        debugToggle.addEventListener('change', updateActions);
+        sameOriginForm.addEventListener('submit', () => { syncValues(); updateActions(); });
+        crossOriginForm.addEventListener('submit', () => { syncValues(); updateActions(); });
         syncValues();
+        updateActions();
     </script>
 </body>
 </html>`;
@@ -234,6 +319,10 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <h1>Form Submission Test (Navigate)</h1>
     <p>Path segment: <strong>${pathSegment || "(none)"}</strong></p>
     <p>These forms navigate away from the page when submitted. Use browser back button to return.</p>
+    <label style="display:inline-flex; align-items:center; gap:8px; margin: 10px 0 0;">
+        <input type="checkbox" id="debugToggle">
+        Submit with <code>?debug=1</code>
+    </label>
     
     <div class="nav">
         <a href="${mainApp}">← Main App</a>
@@ -252,7 +341,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Same Origin</h2>
         <p><code>${apiPath}</code></p>
-        <form id="sameOriginForm" method="POST" action="${apiPath}">
+        <form id="sameOriginForm" method="POST" action="${apiPath}" data-base-action="${apiPath}">
             <input type="hidden" name="email" id="sameOriginEmail">
             <input type="hidden" name="password" id="sameOriginPassword">
             <button type="submit">Submit Form (Same Origin)</button>
@@ -262,7 +351,7 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <div class="section">
         <h2>Cross Origin</h2>
         <p><code>${crossOriginPath}</code></p>
-        <form id="crossOriginForm" method="POST" action="${crossOriginPath}">
+        <form id="crossOriginForm" method="POST" action="${crossOriginPath}" data-base-action="${crossOriginPath}">
             <input type="hidden" name="email" id="crossOriginEmail">
             <input type="hidden" name="password" id="crossOriginPassword">
             <button type="submit">Submit Form (Cross Origin)</button>
@@ -272,6 +361,15 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
     <script>
         const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
+        const debugToggle = document.getElementById('debugToggle');
+        const sameOriginForm = document.getElementById('sameOriginForm');
+        const crossOriginForm = document.getElementById('crossOriginForm');
+
+        function updateActions() {
+            const suffix = debugToggle.checked ? '?debug=1' : '';
+            sameOriginForm.action = sameOriginForm.dataset.baseAction + suffix;
+            crossOriginForm.action = crossOriginForm.dataset.baseAction + suffix;
+        }
         function syncValues() {
             document.getElementById('sameOriginEmail').value = emailInput.value;
             document.getElementById('sameOriginPassword').value = passwordInput.value;
@@ -280,9 +378,11 @@ const generateFormTestPage = (pathSegment: string, useIframe: boolean) => {
         }
         emailInput.addEventListener('input', syncValues);
         passwordInput.addEventListener('input', syncValues);
-        document.getElementById('sameOriginForm').addEventListener('submit', syncValues);
-        document.getElementById('crossOriginForm').addEventListener('submit', syncValues);
+        debugToggle.addEventListener('change', updateActions);
+        sameOriginForm.addEventListener('submit', () => { syncValues(); updateActions(); });
+        crossOriginForm.addEventListener('submit', () => { syncValues(); updateActions(); });
         syncValues();
+        updateActions();
     </script>
 </body>
 </html>`;
