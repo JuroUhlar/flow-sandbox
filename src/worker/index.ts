@@ -1,8 +1,12 @@
 import { Hono, Context } from "hono";
+import { cors } from "hono/cors";
 
 type AppContext = Context<{ Bindings: Env }>;
 
 const app = new Hono<{ Bindings: Env }>();
+
+// Enable CORS for cross-origin requests
+app.use("*", cors());
 
 // Handle login API route handler (shared logic)
 const handleLogin = async (c: AppContext, pathSegment?: string) => {

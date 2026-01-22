@@ -1,6 +1,8 @@
 import { useState, FormEvent } from "react";
 import "./App.css";
 
+const CROSS_ORIGIN_BASE = "https://flow-2.jurajuhlar.site";
+
 function App() {
 	const [email, setEmail] = useState("user@example.com");
 	const [password, setPassword] = useState("password123");
@@ -15,17 +17,17 @@ function App() {
 		return segments[0] || "";
 	};
 
-	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-		e.preventDefault();
+	const submitRequest = async (crossOrigin: boolean) => {
 		setError("");
 		setLoading(true);
 		setSuccess(false);
 
 		const pathSegment = getPathSegment();
 		const apiPath = pathSegment ? `/${pathSegment}/api/create-account` : "/api/create-account";
+		const url = crossOrigin ? `${CROSS_ORIGIN_BASE}${apiPath}` : apiPath;
 
 		try {
-			const response = await fetch(apiPath, {
+			const response = await fetch(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -46,6 +48,15 @@ function App() {
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		await submitRequest(false);
+	};
+
+	const handleCrossOriginSubmit = async () => {
+		await submitRequest(true);
 	};
 
 	return (
@@ -81,6 +92,14 @@ function App() {
 					</div>
 					<button type="submit" disabled={loading} className="login-button">
 						{loading ? "Creating account..." : "Create account"}
+					</button>
+					<button
+						type="button"
+						disabled={loading}
+						className="login-button"
+						onClick={handleCrossOriginSubmit}
+					>
+						{loading ? "Creating account..." : "Sign up cross origin"}
 					</button>
 				</form>
 			</div>
